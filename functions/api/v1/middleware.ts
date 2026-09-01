@@ -4,6 +4,10 @@ export type AppBindings = {
   Bindings: {
     APP_PASSKEY?: string;
     DB: D1Database;
+    ONE_API_BASE_URL?: string;
+    ONE_API_KEY?: string;
+    MULTIMODAL_MODELS?: string;
+    TRANSCRIBE_MODEL?: string;
   };
 };
 

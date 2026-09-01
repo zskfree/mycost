@@ -20,7 +20,7 @@
 8. [Cloudflare Pages 全栈工程与数据库设计](#8-cloudflare-pages-全栈工程与数据库设计)
 9. [精简接口规范（API Specification）](#9-精简接口规范api-specification)
 10. [实施路线图与测试验收矩阵](#10-实施路线图与测试验收矩阵)
-11. [Cloudflare 部署交接说明要求](#11-cloudflare-部署交接说明要求)
+11. [Cloudflare 部署与苹果快捷指令交接说明](#11-cloudflare-部署与苹果快捷指令交接说明)
 
 ---
 
@@ -497,59 +497,255 @@ Authorization: Bearer <APP_PASSKEY>
 
 ---
 
-## 11. Cloudflare 部署交接说明要求
+## 11. Cloudflare 部署与苹果快捷指令交接说明
 
-代码实现完成后，必须在本章节补齐 Cloudflare 部署说明，方便后续交给大模型或人工继续开发、部署和排障。部署说明必须保持可执行、可复制、可验收。
+本项目当前实现为 Vite + React PWA、Cloudflare Pages Functions、Cloudflare D1、One API 解析管道。部署和继续开发时，以本节作为交接入口。
 
-### 11.1 必须说明的部署对象
-- **Cloudflare Pages**：项目创建方式、构建命令、输出目录、Functions 路由入口。
-- **Cloudflare D1**：数据库创建命令、`wrangler.toml` 绑定名、`database_id` 填写位置、schema 初始化命令。
-- **环境变量**：`APP_PASSKEY`、`ONE_API_BASE_URL`、`ONE_API_KEY`、模型配置变量；明确哪些在本地 `.env`，哪些在 Cloudflare Pages 控制台配置。
-- **One API**：网关地址格式、模型名配置、文本解析接口、音频接口、超时和降级策略。
-- **iOS 快捷指令**：请求 URL、Header、JSON 字段、`request_id` 生成方式、客户端时间字段。
+### 11.1 当前目录结构
 
-### 11.2 必须给出的命令示例
+```text
+mycost/
+├── db/schema.sql                         # Cloudflare D1 表结构
+├── docs/语音输入记账App_架构规范_v0.1.md  # 架构、部署、快捷指令说明
+├── functions/api/v1/                     # Pages Functions + Hono API
+│   ├── [[route]].ts                      # /api/v1 路由入口
+│   ├── ai.ts                             # One API 调用、Prompt、JSON 清洗
+│   ├── db.ts                             # D1 CRUD 和汇总
+│   └── middleware.ts                     # Bearer Token 鉴权
+├── public/manifest.json                  # PWA manifest
+├── scripts/probe_one_api.py              # One API 连通性探针
+├── src/                                  # React PWA
+├── wrangler.toml                         # Cloudflare 项目和 D1 绑定
+└── package.json                          # npm scripts
+```
+
+### 11.2 Cloudflare Pages 部署
+
+Pages 项目建议使用 Cloudflare 控制台连接 Git 仓库，或使用 Wrangler 手动部署。
+
+- **Framework preset**：Vite
+- **Build command**：`npm run build`
+- **Build output directory**：`dist`
+- **Functions directory**：`functions`
+- **Node.js**：建议使用 Node 20+ 或当前本机 Node 24
+
+本地验证命令：
+
 ```bash
 npm install
 npm run check
 npm run build
-npx wrangler d1 create mycost
-npx wrangler d1 execute mycost --file=./db/schema.sql
+```
+
+手动部署命令：
+
+```bash
 npx wrangler pages deploy dist --project-name=mycost
 ```
 
-> 命令需要按最终工程实际情况修正，不允许保留占位命令不解释。
+部署后健康检查：
 
-### 11.3 必须给出的验收步骤
-- 访问 PWA 首页，确认静态页面加载正常。
-- 访问 `/api/v1/health`，确认 Functions 正常工作。
-- 使用 Bearer Token 调用 `/api/v1/entry`，确认可写入 D1。
-- 调用 `/api/v1/transactions`，确认能读回刚写入的账单。
-- 导出 CSV / JSON，确认金额、日期、分类、原始文本完整。
-- 模拟重复 `request_id`，确认不会重复入库。
-- 模拟模型失败，确认接口返回可理解错误，不产生脏数据。
+```bash
+curl https://<your-pages-domain>/api/v1/health
+```
 
-### 11.4 苹果快捷指令设置说明要求
-代码实现完成后，必须补齐 iOS Shortcuts 的详细设置说明，确保用户可按步骤复现主力输入链路。
+预期返回：
 
-必须覆盖：
-- **触发方式**：Action Button、锁屏组件、轻点背面、Siri 语音触发分别如何绑定。
-- **文本直录链路**：听写文本动作、变量命名、空文本判断、POST JSON 请求配置。
-- **音频兜底链路**：录制音频动作、最长录音时间、multipart 上传配置、失败提示。
-- **请求配置**：生产环境 URL、`Authorization: Bearer <APP_PASSKEY>`、`Content-Type`、`request_id`、`datetime`、`source` 字段。
-- **时间字段**：如何传递客户端本地 ISO 时间，如何附带星期信息。
-- **通知文案**：成功、失败、重复提交、网络错误、模型解析失败的提示文本。
-- **安全注意**：快捷指令中只保存个人 `APP_PASSKEY`，不得写入 One API Key。
-- **验收步骤**：新增单笔、多笔拆分、昨天/前天日期、重复 `request_id`、断网失败提示。
+```json
+{"status":"ok","timestamp":"..."}
+```
 
-### 11.5 交接给大模型时必须保留的上下文
-- 当前目录结构和每个目录职责。
-- 已实现接口和未实现接口清单。
-- D1 schema 最新版本。
-- 环境变量完整列表，但不得写入真实密钥。
-- 已知限制、临时方案和后续优先级。
-- 最后一次本地验证命令和结果。
-- Cloudflare 部署说明与苹果快捷指令设置说明是否已补齐。
+### 11.3 Cloudflare D1 初始化
+
+创建 D1 数据库：
+
+```bash
+npx wrangler d1 create mycost
+```
+
+把命令输出中的 `database_id` 写入 `wrangler.toml`：
+
+```toml
+[[d1_databases]]
+binding = "DB"
+database_name = "mycost"
+database_id = "<cloudflare-returned-database-id>"
+```
+
+初始化远端 schema：
+
+```bash
+npx wrangler d1 execute mycost --remote --file=./db/schema.sql
+```
+
+本地调试 D1 时可执行：
+
+```bash
+npx wrangler d1 execute mycost --local --file=./db/schema.sql
+```
+
+`DB` 绑定名不能改，代码中 `c.env.DB` 依赖该名称。
+
+### 11.4 环境变量与密钥
+
+本地开发从 `.env.example` 复制 `.env`。真实密钥只写本地 `.env` 或 Cloudflare Pages 环境变量，不写入 Git。
+
+| 变量 | 用途 | 配置位置 |
+|---|---|---|
+| `APP_PASSKEY` | PWA、快捷指令调用 API 的 Bearer Token | 本地 `.env`；Pages 生产环境变量 |
+| `ONE_API_BASE_URL` | 自建 One API 根地址，必须包含 `/v1` | 本地 `.env`；Pages 生产环境变量 |
+| `ONE_API_KEY` | One API Token，只保存在服务端 | 本地 `.env`；Pages 生产环境变量 |
+| `MULTIMODAL_MODELS` | 逗号分隔模型降级列表 | 本地 `.env`；Pages 生产环境变量 |
+| `TRANSCRIBE_MODEL` | 独立 STT 模型，预留变量 | 本地 `.env`；Pages 生产环境变量 |
+| `VITE_API_BASE_URL` | 前端 API 根路径，默认 `/api/v1` | 本地 `.env`；需要跨域时配置 |
+
+Cloudflare Pages 设置密钥示例：
+
+```bash
+npx wrangler pages secret put APP_PASSKEY --project-name=mycost
+npx wrangler pages secret put ONE_API_KEY --project-name=mycost
+```
+
+普通环境变量可在 Pages 控制台设置：`ONE_API_BASE_URL`、`MULTIMODAL_MODELS`、`TRANSCRIBE_MODEL`。
+
+### 11.5 One API 配置
+
+后端通过 `/chat/completions` 调用 One API，按 `MULTIMODAL_MODELS` 从左到右降级。当前请求约定：
+
+- 文本链路：`POST {ONE_API_BASE_URL}/chat/completions`
+- 音频链路：同接口，消息内容包含 `input_audio`
+- 返回必须是 JSON object，包含 `transactions` 数组
+- 金额由模型输出“元”，服务端转换为 `amount_cents`
+- 模型失败会尝试下一个模型；全部失败时 API 返回 `status: ERROR`
+
+建议先用 `scripts/probe_one_api.py` 验证 One API Token、模型名和音频能力，再部署生产环境。
+
+### 11.6 API 验收命令
+
+写入单笔文本账单：
+
+```bash
+curl -X POST https://<your-pages-domain>/api/v1/entry \
+  -H "Authorization: Bearer <APP_PASSKEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"request_id":"test-001","text":"中午吃牛肉面 28 块，微信支付","datetime":"2026-09-01T12:30:00+08:00","weekday":"二","source":"shortcuts"}'
+```
+
+查询账单：
+
+```bash
+curl https://<your-pages-domain>/api/v1/transactions?month=2026-09 \
+  -H "Authorization: Bearer <APP_PASSKEY>"
+```
+
+测试幂等：重复发送同一个 `request_id`，预期只写入一次，响应中 `duplicated` 为 `true`。
+
+导出数据：
+
+```bash
+curl -L https://<your-pages-domain>/api/v1/export?format=csv \
+  -H "Authorization: Bearer <APP_PASSKEY>" \
+  -o mycost_export.csv
+```
+
+### 11.7 苹果快捷指令设置说明
+
+快捷指令中只保存 `APP_PASSKEY`，不要保存 `ONE_API_KEY`。One API Key 只存在 Cloudflare 服务端环境变量里。
+
+文本直录快捷指令动作顺序：
+
+```text
+1. 听写文本
+2. 如果“听写文本”没有任何值：显示通知“没有听到记账内容”并停止
+3. 生成 UUID，命名为 request_id
+4. 获取当前日期，格式 ISO 8601，命名为 datetime
+5. 获取当前日期的星期，命名为 weekday
+6. 获取 URL 内容
+```
+
+`获取 URL 内容` 配置：
+
+```text
+URL: https://<your-pages-domain>/api/v1/entry
+方法: POST
+请求正文: JSON
+Header:
+  Authorization: Bearer <APP_PASSKEY>
+  Content-Type: application/json
+JSON Body:
+  request_id: <UUID>
+  text: <听写文本>
+  datetime: <ISO 8601 当前时间>
+  weekday: <星期>
+  source: shortcuts
+```
+
+响应处理：
+
+```text
+1. 从响应字典读取 message
+2. 如果 status 是 SUCCESS：显示通知 message
+3. 如果 status 不是 SUCCESS：显示通知“记账失败：<message>”
+4. 网络错误时显示通知“记账失败：网络不可用或服务异常”
+```
+
+音频兜底快捷指令动作顺序：
+
+```text
+1. 录制音频，最长 10 秒，完成后继续
+2. 生成 UUID，命名为 request_id
+3. 获取当前日期 ISO 8601，命名为 datetime
+4. 获取 URL 内容
+```
+
+音频请求配置：
+
+```text
+URL: https://<your-pages-domain>/api/v1/entry
+方法: POST
+请求正文: 表单
+Header:
+  Authorization: Bearer <APP_PASSKEY>
+Form Data:
+  request_id: <UUID>
+  audio: <录制音频文件>
+  datetime: <ISO 8601 当前时间>
+  weekday: <星期>
+  source: shortcuts
+```
+
+推荐绑定方式：
+
+- **Action Button**：设置 > 操作按钮 > 快捷指令 > 选择“MyCost 文本记账”。
+- **锁屏组件**：锁屏长按 > 自定 > 添加快捷指令组件 > 选择“MyCost 文本记账”。
+- **轻点背面**：设置 > 辅助功能 > 触控 > 轻点背面 > 轻点两下或三下 > 选择快捷指令。
+- **Siri**：把快捷指令命名为“记一笔”，之后可说“嘿 Siri，记一笔”。
+
+快捷指令验收：
+
+- 说“中午吃牛肉面 28 块”，应通知“已记入「餐饮/午餐」¥28.00”。
+- 说“买咖啡18，晚上超市买菜65”，应写入 2 笔。
+- 周二说“昨天打车花了32”，日期应落到周一。
+- 重复同一 `request_id`，D1 不应重复新增。
+- 断网或服务异常时，应出现失败通知而不是静默结束。
+
+### 11.8 当前实现状态
+
+已实现：
+
+- React PWA 基础界面、Token 保存、文本记账、浏览器录音上传、账单列表、删除、CSV/JSON 导出入口。
+- Hono API：`/health`、`/entry`、`/transactions`、`/transactions/:id`、`/export`。
+- D1：交易表、分类表、设置表 schema；交易新增、查询、更新、软删除、汇总。
+- One API：文本与音频统一解析入口，按模型列表降级。
+- 验证：`npm run check` 通过，`npm run build` 通过。
+
+待生产部署时完成：
+
+- 创建真实 Cloudflare Pages 项目和 D1 数据库。
+- 把 `wrangler.toml` 中 `database_id` 替换为真实值。
+- 设置生产环境变量和密钥。
+- 用真实 One API Token 验证文本和音频解析。
+- 在 iPhone 上创建并绑定快捷指令。
 
 ---
 
