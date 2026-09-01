@@ -20,6 +20,7 @@
 8. [Cloudflare Pages 全栈工程与数据库设计](#8-cloudflare-pages-全栈工程与数据库设计)
 9. [精简接口规范（API Specification）](#9-精简接口规范api-specification)
 10. [实施路线图与测试验收矩阵](#10-实施路线图与测试验收矩阵)
+11. [Cloudflare 部署交接说明要求](#11-cloudflare-部署交接说明要求)
 
 ---
 
@@ -493,6 +494,62 @@ Authorization: Bearer <APP_PASSKEY>
 | **T03** | 相对时间准确解析 | 周二晚上说：“昨天打车花了32” | `transaction_date` 准确记录为周一的日期，无时区偏差 |
 | **T04** | Web PWA 看板管理 | 在浏览器中打开 PWA 页面 | 自动拉取最新账单列表与月度统计；支持即席修改金额与一键删除 |
 | **T05** | 数据自主导出 | 点击导出 CSV 按钮 | 成功下载标准 CSV 表格，可无缝用 Excel 打开或导入钱迹/随手记 |
+
+---
+
+## 11. Cloudflare 部署交接说明要求
+
+代码实现完成后，必须在本章节补齐 Cloudflare 部署说明，方便后续交给大模型或人工继续开发、部署和排障。部署说明必须保持可执行、可复制、可验收。
+
+### 11.1 必须说明的部署对象
+- **Cloudflare Pages**：项目创建方式、构建命令、输出目录、Functions 路由入口。
+- **Cloudflare D1**：数据库创建命令、`wrangler.toml` 绑定名、`database_id` 填写位置、schema 初始化命令。
+- **环境变量**：`APP_PASSKEY`、`ONE_API_BASE_URL`、`ONE_API_KEY`、模型配置变量；明确哪些在本地 `.env`，哪些在 Cloudflare Pages 控制台配置。
+- **One API**：网关地址格式、模型名配置、文本解析接口、音频接口、超时和降级策略。
+- **iOS 快捷指令**：请求 URL、Header、JSON 字段、`request_id` 生成方式、客户端时间字段。
+
+### 11.2 必须给出的命令示例
+```bash
+npm install
+npm run check
+npm run build
+npx wrangler d1 create mycost
+npx wrangler d1 execute mycost --file=./db/schema.sql
+npx wrangler pages deploy dist --project-name=mycost
+```
+
+> 命令需要按最终工程实际情况修正，不允许保留占位命令不解释。
+
+### 11.3 必须给出的验收步骤
+- 访问 PWA 首页，确认静态页面加载正常。
+- 访问 `/api/v1/health`，确认 Functions 正常工作。
+- 使用 Bearer Token 调用 `/api/v1/entry`，确认可写入 D1。
+- 调用 `/api/v1/transactions`，确认能读回刚写入的账单。
+- 导出 CSV / JSON，确认金额、日期、分类、原始文本完整。
+- 模拟重复 `request_id`，确认不会重复入库。
+- 模拟模型失败，确认接口返回可理解错误，不产生脏数据。
+
+### 11.4 苹果快捷指令设置说明要求
+代码实现完成后，必须补齐 iOS Shortcuts 的详细设置说明，确保用户可按步骤复现主力输入链路。
+
+必须覆盖：
+- **触发方式**：Action Button、锁屏组件、轻点背面、Siri 语音触发分别如何绑定。
+- **文本直录链路**：听写文本动作、变量命名、空文本判断、POST JSON 请求配置。
+- **音频兜底链路**：录制音频动作、最长录音时间、multipart 上传配置、失败提示。
+- **请求配置**：生产环境 URL、`Authorization: Bearer <APP_PASSKEY>`、`Content-Type`、`request_id`、`datetime`、`source` 字段。
+- **时间字段**：如何传递客户端本地 ISO 时间，如何附带星期信息。
+- **通知文案**：成功、失败、重复提交、网络错误、模型解析失败的提示文本。
+- **安全注意**：快捷指令中只保存个人 `APP_PASSKEY`，不得写入 One API Key。
+- **验收步骤**：新增单笔、多笔拆分、昨天/前天日期、重复 `request_id`、断网失败提示。
+
+### 11.5 交接给大模型时必须保留的上下文
+- 当前目录结构和每个目录职责。
+- 已实现接口和未实现接口清单。
+- D1 schema 最新版本。
+- 环境变量完整列表，但不得写入真实密钥。
+- 已知限制、临时方案和后续优先级。
+- 最后一次本地验证命令和结果。
+- Cloudflare 部署说明与苹果快捷指令设置说明是否已补齐。
 
 ---
 
