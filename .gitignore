@@ -1,0 +1,21 @@
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Node & dependencies
+node_modules/
+dist/
+.vite/
+.wrangler/
+.expo/
+
+# TypeScript / coverage
+*.tsbuildinfo
+coverage/
+
+# Logs & temp
+*.log
+*.bak
+__pycache__/
+.venv/
