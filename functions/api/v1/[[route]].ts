@@ -1,5 +1,4 @@
 import { Hono } from 'hono';
-import { handle } from 'hono/cloudflare-pages';
 import { parseEntryWithOneApi, parsedToTransactionInput, toAmountCents } from './ai';
 import {
   findTransactionByRequestId,
@@ -171,7 +170,7 @@ app.get(`${API_PREFIX}/export`, async (c) => {
   });
 });
 
-export const onRequest = handle(app);
+export { app };
 
 async function parseEntryRequest(request: Request): Promise<EntryPayload & { audio?: File }> {
   const contentType = request.headers.get('Content-Type') ?? '';

@@ -3,7 +3,7 @@
 > **文档版本**：V0.1 (Lightweight Cloud-First & Direct D1 Edition)  
 > **核心定位**：个人高频使用的极致轻量、低维护、可长期运行的语音记账系统，主打文本优先、音频兜底、单库真值源  
 > **运行形态**：**iOS 快捷指令（Shortcuts）全局后台免开界面，主力文本直录** + **Web PWA 跨平台数据看板与维护管理中心**（iPhone/iPad/PC/Mac）  
-> **成本与运维**：**低常驻成本、低运维开销**（Cloudflare Pages 全栈 Serverless + Cloudflare D1 + 自建 One API）  
+> **成本与运维**：**低常驻成本、低运维开销**（Cloudflare Workers + Static Assets + Cloudflare D1 + 自建 One API）  
 > **核心指标**：文本链路端到端写入 **目标 <1s**；音频兜底链路按 **1.5 ~ 3s** 设计；账单直存云端 D1；音频尽量不落盘、入库后立即释放；数万笔账单保持 MB 级体积。
 
 ---
@@ -17,7 +17,7 @@
 5. [云端单一真值源（Cloudflare D1）与数据模型](#5-云端单一真值源cloudflare-d1与数据模型)
 6. [Web 看板交互与高效管理体验](#6-web-看板交互与高效管理体验)
 7. [数据自主权与标准格式导出备份](#7-数据自主权与标准格式导出备份)
-8. [Cloudflare Pages 全栈工程与数据库设计](#8-cloudflare-pages-全栈工程与数据库设计)
+8. [Cloudflare Workers 全栈工程与数据库设计](#8-cloudflare-workers-全栈工程与数据库设计)
 9. [精简接口规范（API Specification）](#9-精简接口规范api-specification)
 10. [实施路线图与测试验收矩阵](#10-实施路线图与测试验收矩阵)
 11. [Cloudflare 部署与苹果快捷指令交接说明](#11-cloudflare-部署与苹果快捷指令交接说明)
@@ -26,7 +26,7 @@
 
 ## 1. 系统总体架构与极简拓扑
 
-系统采用 **“Cloudflare Pages Serverless 全栈 + Cloudflare D1 单一真值源 + 快捷指令直录 + PWA 随开随审”** 的极简现代架构：
+系统采用 **“Cloudflare Workers 全栈 + Static Assets + Cloudflare D1 单一真值源 + 快捷指令直录 + PWA 随开随审”** 的极简现代架构：
 
 ```mermaid
 flowchart TD
@@ -38,7 +38,7 @@ flowchart TD
         PWA["Web PWA 现代看板 (iPhone / iPad / Mac / PC 浏览器)"]
     end
 
-    subgraph EdgeServerless ["Cloudflare Pages 全栈边缘节点 (低运维 / 低常驻成本)"]
+    subgraph EdgeServerless ["Cloudflare Workers 全栈边缘节点 (低运维 / 低常驻成本)"]
         HonoAPI["Hono API 路由网关 (/api/v1/*)"]
         AuthMiddleware["API 鉴权拦截器"]
         PromptEngine["时间基准强注入 & JSON 容错清洗器"]
@@ -304,12 +304,13 @@ Web PWA 主要作为日常财务概览、明细维护与深度分析的工作台
 
 ---
 
-## 8. Cloudflare Pages 全栈工程与数据库设计
+## 8. Cloudflare Workers 全栈工程与数据库设计
 
 ### 8.1 统一工程目录结构
 ```text
 mycost/
-├── functions/                     # Cloudflare Pages Functions (Serverless API)
+├── worker/                        # Cloudflare Worker 入口
+├── functions/                     # API 和 D1 业务模块
 │   └── api/
 │       └── v1/
 │           ├── [[route]].ts       # Hono 路由入口
@@ -333,7 +334,7 @@ mycost/
 │   ├── icon-192.png
 │   └── icon-512.png
 ├── schema.sql                     # Cloudflare D1 初始建表脚本
-├── wrangler.toml                  # Cloudflare Pages / D1 绑定配置
+├── wrangler.toml                  # Cloudflare Worker / Assets / D1 配置
 ├── package.json
 └── tsconfig.json
 ```
@@ -463,7 +464,7 @@ Authorization: Bearer <APP_PASSKEY>
 
 ```text
 阶段 1：全栈脚手架与 D1 数据库构建 (Day 1)
-  • 初始化 Vite + React 19 + TypeScript + Cloudflare Pages Functions
+  • 初始化 Vite + React 19 + TypeScript + Cloudflare Worker Static Assets
   • 配置 wrangler.toml 与 Cloudflare D1 建表 (schema.sql)
   • 实现 Hono 路由框架与 Bearer 鉴权中间件
 
@@ -499,7 +500,15 @@ Authorization: Bearer <APP_PASSKEY>
 
 ## 11. Cloudflare 部署与苹果快捷指令交接说明
 
-本项目当前实现为 Vite + React PWA、Cloudflare Pages Functions、Cloudflare D1、One API 解析管道。部署和继续开发时，以本节作为交接入口。
+本项目当前实现为 Vite + React PWA、Cloudflare Worker Static Assets、Cloudflare D1、One API 解析管道。部署和继续开发时，以本节作为交接入口。
+
+详细操作文档：
+
+- [Cloudflare 网页端部署说明](./Cloudflare网页端部署说明.md)
+- [Cloudflare Workers 部署说明](./Cloudflare部署说明.md)
+- [苹果快捷指令设置说明](./苹果快捷指令设置说明.md)
+
+两份文档必须和代码同步维护。生产域名、D1 `database_id`、环境变量名称、API 字段发生变化时，先修改详细文档，再继续交接。
 
 ### 11.1 当前目录结构
 
@@ -507,7 +516,8 @@ Authorization: Bearer <APP_PASSKEY>
 mycost/
 ├── db/schema.sql                         # Cloudflare D1 表结构
 ├── docs/语音输入记账App_架构规范_v0.1.md  # 架构、部署、快捷指令说明
-├── functions/api/v1/                     # Pages Functions + Hono API
+├── worker/index.ts                       # Cloudflare Worker 入口和静态资产回退
+├── functions/api/v1/                     # Hono API、D1 和 One API 业务代码
 │   ├── [[route]].ts                      # /api/v1 路由入口
 │   ├── ai.ts                             # One API 调用、Prompt、JSON 清洗
 │   ├── db.ts                             # D1 CRUD 和汇总
@@ -515,18 +525,20 @@ mycost/
 ├── public/manifest.json                  # PWA manifest
 ├── scripts/probe_one_api.py              # One API 连通性探针
 ├── src/                                  # React PWA
-├── wrangler.toml                         # Cloudflare 项目和 D1 绑定
+├── wrangler.toml                         # Worker、Assets 和 D1 绑定
 └── package.json                          # npm scripts
 ```
 
-### 11.2 Cloudflare Pages 部署
+### 11.2 Cloudflare Workers 部署
 
-Pages 项目建议使用 Cloudflare 控制台连接 Git 仓库，或使用 Wrangler 手动部署。
+Worker 项目建议使用 Cloudflare 控制台连接 Git 仓库，或使用 Wrangler 手动部署。
 
 - **Framework preset**：Vite
 - **Build command**：`npm run build`
 - **Build output directory**：`dist`
-- **Functions directory**：`functions`
+- **Deploy command**：`npm run deploy`
+- **Worker entry**：`worker/index.ts`
+- **Static Assets directory**：`dist`
 - **Node.js**：建议使用 Node 20+ 或当前本机 Node 24
 
 本地验证命令：
@@ -540,13 +552,13 @@ npm run build
 手动部署命令：
 
 ```bash
-npx wrangler pages deploy dist --project-name=mycost
+npm run deploy
 ```
 
 部署后健康检查：
 
 ```bash
-curl https://<your-pages-domain>/api/v1/health
+curl https://<your-worker-domain>/api/v1/health
 ```
 
 预期返回：
@@ -588,25 +600,25 @@ npx wrangler d1 execute mycost --local --file=./db/schema.sql
 
 ### 11.4 环境变量与密钥
 
-本地开发从 `.env.example` 复制 `.env`。真实密钥只写本地 `.env` 或 Cloudflare Pages 环境变量，不写入 Git。
+本地开发从 `.env.example` 复制 `.env` 或使用 `.dev.vars`。真实密钥只写本地环境文件或 Cloudflare Worker Secrets，不写入 Git。
 
 | 变量 | 用途 | 配置位置 |
 |---|---|---|
-| `APP_PASSKEY` | PWA、快捷指令调用 API 的 Bearer Token | 本地 `.env`；Pages 生产环境变量 |
-| `ONE_API_BASE_URL` | 自建 One API 根地址，必须包含 `/v1` | 本地 `.env`；Pages 生产环境变量 |
-| `ONE_API_KEY` | One API Token，只保存在服务端 | 本地 `.env`；Pages 生产环境变量 |
-| `MULTIMODAL_MODELS` | 逗号分隔模型降级列表 | 本地 `.env`；Pages 生产环境变量 |
-| `TRANSCRIBE_MODEL` | 独立 STT 模型，预留变量 | 本地 `.env`；Pages 生产环境变量 |
+| `APP_PASSKEY` | PWA、快捷指令调用 API 的 Bearer Token | 本地环境文件；Worker 生产 Secret |
+| `ONE_API_BASE_URL` | 自建 One API 根地址，必须包含 `/v1` | 本地环境文件；Worker 生产变量 |
+| `ONE_API_KEY` | One API Token，只保存在服务端 | 本地环境文件；Worker 生产 Secret |
+| `MULTIMODAL_MODELS` | 逗号分隔模型降级列表 | 本地环境文件；Worker 生产变量 |
+| `TRANSCRIBE_MODEL` | 独立 STT 模型，预留变量 | 本地环境文件；Worker 生产变量 |
 | `VITE_API_BASE_URL` | 前端 API 根路径，默认 `/api/v1` | 本地 `.env`；需要跨域时配置 |
 
-Cloudflare Pages 设置密钥示例：
+Cloudflare Worker 设置密钥示例：
 
 ```bash
-npx wrangler pages secret put APP_PASSKEY --project-name=mycost
-npx wrangler pages secret put ONE_API_KEY --project-name=mycost
+npx wrangler secret put APP_PASSKEY
+npx wrangler secret put ONE_API_KEY
 ```
 
-普通环境变量可在 Pages 控制台设置：`ONE_API_BASE_URL`、`MULTIMODAL_MODELS`、`TRANSCRIBE_MODEL`。
+普通环境变量可在 Worker 控制台设置：`ONE_API_BASE_URL`、`MULTIMODAL_MODELS`、`TRANSCRIBE_MODEL`。
 
 ### 11.5 One API 配置
 
@@ -625,7 +637,7 @@ npx wrangler pages secret put ONE_API_KEY --project-name=mycost
 写入单笔文本账单：
 
 ```bash
-curl -X POST https://<your-pages-domain>/api/v1/entry \
+curl -X POST https://<your-worker-domain>/api/v1/entry \
   -H "Authorization: Bearer <APP_PASSKEY>" \
   -H "Content-Type: application/json" \
   -d '{"request_id":"test-001","text":"中午吃牛肉面 28 块，微信支付","datetime":"2026-09-01T12:30:00+08:00","weekday":"二","source":"shortcuts"}'
@@ -634,7 +646,7 @@ curl -X POST https://<your-pages-domain>/api/v1/entry \
 查询账单：
 
 ```bash
-curl https://<your-pages-domain>/api/v1/transactions?month=2026-09 \
+curl https://<your-worker-domain>/api/v1/transactions?month=2026-09 \
   -H "Authorization: Bearer <APP_PASSKEY>"
 ```
 
@@ -643,7 +655,7 @@ curl https://<your-pages-domain>/api/v1/transactions?month=2026-09 \
 导出数据：
 
 ```bash
-curl -L https://<your-pages-domain>/api/v1/export?format=csv \
+curl -L https://<your-worker-domain>/api/v1/export?format=csv \
   -H "Authorization: Bearer <APP_PASSKEY>" \
   -o mycost_export.csv
 ```
@@ -666,7 +678,7 @@ curl -L https://<your-pages-domain>/api/v1/export?format=csv \
 `获取 URL 内容` 配置：
 
 ```text
-URL: https://<your-pages-domain>/api/v1/entry
+URL: https://<your-worker-domain>/api/v1/entry
 方法: POST
 请求正文: JSON
 Header:
@@ -701,7 +713,7 @@ JSON Body:
 音频请求配置：
 
 ```text
-URL: https://<your-pages-domain>/api/v1/entry
+URL: https://<your-worker-domain>/api/v1/entry
 方法: POST
 请求正文: 表单
 Header:
@@ -741,7 +753,7 @@ Form Data:
 
 待生产部署时完成：
 
-- 创建真实 Cloudflare Pages 项目和 D1 数据库。
+- 创建真实 Cloudflare Worker 和 D1 数据库。
 - 把 `wrangler.toml` 中 `database_id` 替换为真实值。
 - 设置生产环境变量和密钥。
 - 用真实 One API Token 验证文本和音频解析。

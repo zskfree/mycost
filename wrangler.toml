@@ -1,6 +1,12 @@
 name = "mycost"
+main = "worker/index.ts"
 compatibility_date = "2026-09-01"
-pages_build_output_dir = "dist"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
 
 [vars]
 APP_NAME = "MyCost"
