@@ -47,7 +47,7 @@ app.post(`${API_PREFIX}/entry`, async (c) => {
       return c.json({
         status: 'SUCCESS',
         duplicated: true,
-        message: formatEntryMessage([existing]),
+        message: `重复请求，已忽略：${formatEntryMessage([existing])}`,
         transcript: existing.raw_text,
         transactions: [toApiTransaction(existing)],
         execution_time_ms: Date.now() - startedAt,

@@ -3,14 +3,24 @@ import type { TransactionsResponse } from '../types';
 interface DashboardStatsProps {
   response: TransactionsResponse;
   month: string;
+  onMonthChange: (month: string) => void;
 }
 
-export function DashboardStats({ response, month }: DashboardStatsProps) {
+export function DashboardStats({ response, month, onMonthChange }: DashboardStatsProps) {
   const balance = response.total_income - response.total_expense;
 
   return (
     <section className="panel">
-      <h2>{month} 汇总</h2>
+      <div className="panel-heading">
+        <h2>{month} 汇总</h2>
+        <input
+          className="month-field"
+          type="month"
+          value={month}
+          onChange={(event) => onMonthChange(event.target.value)}
+          aria-label="选择账单月份"
+        />
+      </div>
       <div className="stat-grid">
         <div className="stat-item">
           <span>支出</span>

@@ -118,7 +118,8 @@ export async function parseEntryWithOneApi(args: {
       });
 
       if (!response.ok) {
-        lastErrors.push(`${model}: HTTP ${response.status}`);
+        const errorBody = await safeReadErrorBody(response);
+        lastErrors.push(`${model}: HTTP ${response.status}${errorBody ? ` ${errorBody}` : ''}`);
         continue;
       }
 
@@ -185,6 +186,15 @@ export function cleanAndParseJSON<T>(rawContent: string): T {
 
 export function toAmountCents(amount: number): number {
   return Math.round(amount * 100);
+}
+
+async function safeReadErrorBody(response: Response): Promise<string> {
+  try {
+    const text = await response.text();
+    return text.replace(/\s+/g, ' ').trim().slice(0, 240);
+  } catch {
+    return '';
+  }
 }
 
 function normalizeBaseUrl(value?: string): string | null {

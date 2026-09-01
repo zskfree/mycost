@@ -115,6 +115,7 @@ h1 {
 }
 
 .text-field,
+.month-field,
 .field-row input,
 .field-row textarea {
   width: 100%;
@@ -129,6 +130,11 @@ h1 {
 .field-row textarea {
   min-height: 84px;
   resize: vertical;
+}
+
+.month-field {
+  max-width: 148px;
+  color-scheme: dark;
 }
 
 .field-row button,

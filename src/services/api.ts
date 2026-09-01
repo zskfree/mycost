@@ -28,23 +28,25 @@ export function listTransactions(token: string, month: string): Promise<Transact
 }
 
 export function createEntry(token: string, text: string): Promise<EntryResponse> {
+  const clientTime = getClientTimeContext();
   return apiFetch<EntryResponse>('/entry', token, {
     method: 'POST',
     body: JSON.stringify({
       request_id: createRequestId(),
       text,
-      datetime: new Date().toISOString(),
-      weekday: String(new Date().getDay()),
+      datetime: clientTime.datetime,
+      weekday: clientTime.weekday,
       source: 'pwa_text',
     }),
   });
 }
 
 export function createAudioEntry(token: string, audio: File, text = ''): Promise<EntryResponse> {
+  const clientTime = getClientTimeContext();
   const body = new FormData();
   body.set('request_id', createRequestId());
-  body.set('datetime', new Date().toISOString());
-  body.set('weekday', String(new Date().getDay()));
+  body.set('datetime', clientTime.datetime);
+  body.set('weekday', clientTime.weekday);
   body.set('source', 'pwa_voice');
   if (text.trim()) {
     body.set('text', text.trim());
@@ -80,6 +82,17 @@ export async function downloadExport(token: string, format: 'csv' | 'json'): Pro
 
 export function createRequestId(): string {
   return crypto.randomUUID();
+}
+
+function getClientTimeContext(): { datetime: string; weekday: string } {
+  const date = new Date();
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? '+' : '-';
+  const absOffset = Math.abs(offsetMinutes);
+  const offset = `${sign}${String(Math.floor(absOffset / 60)).padStart(2, '0')}:${String(absOffset % 60).padStart(2, '0')}`;
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 19);
+  const weekday = new Intl.DateTimeFormat('zh-CN', { weekday: 'long' }).format(date).replace('星期', '');
+  return { datetime: `${local}${offset}`, weekday };
 }
 
 async function readErrorMessage(response: Response): Promise<string> {
